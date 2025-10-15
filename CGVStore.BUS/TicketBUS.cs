@@ -70,8 +70,8 @@ namespace CGVStore.BUS
             var khachHang = new KhachHang
             {
                 TenKH = tenKH,
-                SDT = sdt,
-                GioiTinh = gioiTinh
+                
+                SDT = int.Parse(sdt),          
             };
             int maKH = ticketDAL.GetOrCreateKhachHang(khachHang); // Giả định DAL xử lý việc tìm/tạo và trả về MaKH
 
@@ -79,9 +79,8 @@ namespace CGVStore.BUS
             var hoaDon = new HoaDon
             {
                 MaKH = maKH,
-                TongTien = tongTien,
+                TongTien = (float?)tongTien,
                 NgayMua = DateTime.Now,
-                AreaID = areaID.ToString() // Giả định AreaID là string như trong Form3.cs
             };
             int maHD = ticketDAL.TaoHoaDon(hoaDon); // Giả định DAL trả về MaHD sau khi SaveChanges
 
@@ -90,7 +89,7 @@ namespace CGVStore.BUS
             {
                 MaHD = maHD,
                 MaKH = maKH,
-                SoGheNgoi = seat
+                SoGheNgoi = int.Parse(seat)
             }).ToList();
 
             ticketDAL.ThemChiTiet(chiTiets);

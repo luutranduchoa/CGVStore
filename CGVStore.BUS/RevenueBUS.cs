@@ -1,13 +1,15 @@
-﻿using System;
+﻿using CGVStore.DAL; // Cần tham chiếu đến DAL Project để sử dụng RevenueDAL và các DTO
+using CGVStore.Models; // Cần tham chiếu đến Entity Models
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using CGVStore.DAL; // Cần tham chiếu đến DAL Project
-using CGVStore.Models; // Cần tham chiếu đến Entity Models
+using static CGVStore.DAL.RevenueDAL;
 
 namespace CGVStore.BUS
 {
     public class RevenueBUS
     {
+        // Khai báo instance của lớp DAL để giao tiếp với database
         private RevenueDAL revenueDAL = new RevenueDAL();
 
         // =======================================================
@@ -15,21 +17,17 @@ namespace CGVStore.BUS
         // =======================================================
 
         /// <summary>
-        /// Lấy dữ liệu chi tiết Hóa Đơn và tính toán Số Lượng Ghế cho mỗi hóa đơn.
+        /// Lấy dữ liệu chi tiết Hóa Đơn đã được tổng hợp (MaHD, Tên KH, Tổng Tiền, Số Lượng Ghế).
         /// </summary>
-        /// <returns>List chứa thông tin chi tiết hóa đơn (DTO/ViewModel).</returns>
-        public List<RevenueDetailDTO> LayDuLieuDoanhThuChiTiet()
+        /// <returns>List chứa thông tin chi tiết hóa đơn (RevenueDetailDTO).</returns>
+        public List<DAL.RevenueDAL.RevenueDetailDTO> LayDuLieuDoanhThuChiTiet()
         {
-            // Giả định DAL trả về một List<HoaDon> đã được xử lý JOIN/INCLUDE.
-            // Nếu DAL trả về dữ liệu thô, BUS sẽ xử lý việc tính toán.
-
-            // Dựa trên Form6.cs, logic tính SoLuongGhe và JOIN KhachHang được thực hiện trong truy vấn LINQ.
-            // Để đơn giản, giả định DAL đã trả về list các đối tượng Aggregated
-
+            // Logic nghiệp vụ trong BUS có thể bao gồm:
+            // 1. Gọi hàm từ DAL để lấy dữ liệu đã JOIN/tổng hợp.
             var revenueData = revenueDAL.GetRevenueDetail();
 
-            // Logic nghiệp vụ: (Nếu cần tính toán thêm trên bộ nhớ RAM)
-            // Ví dụ: tính thêm % lợi nhuận, phân loại khách hàng VIP...
+            // 2. Xử lý thêm nếu cần (Ví dụ: tính thêm % khuyến mãi, sắp xếp lại, lọc theo điều kiện phức tạp)
+            // ...
 
             return revenueData;
         }
@@ -42,20 +40,28 @@ namespace CGVStore.BUS
         /// Lấy dữ liệu thống kê theo tháng (Doanh thu, Ghế, Khách hàng).
         /// </summary>
         /// <returns>Danh sách DTO/ViewModel cho báo cáo thống kê.</returns>
-        public List<StatisticalDTO> LayDuLieuThongKeTheoThang()
+        public List<DAL.RevenueDAL.StatisticalDTO> LayDuLieuThongKeTheoThang()
         {
-            // Form7.cs sử dụng logic GROUP BY theo tháng (Year và Month)
-            var rawData = revenueDAL.GetHoaDonRawData(); // Lấy tất cả Hóa Đơn và Chi Tiết từ DAL
+            // Lấy toàn bộ dữ liệu Hóa Đơn thô từ DAL (đã có Include KhachHang)
+            var rawData = revenueDAL.GetHoaDonRawData();
 
+            // Thực hiện tính toán thống kê (GROUP BY) trên bộ nhớ (LINQ to Objects)
             var statisticalData = rawData
                 .Where(hd => hd.NgayMua.HasValue) // Chỉ lấy hóa đơn có ngày mua
-                .GroupBy(hd => new { Year = hd.NgayMua.Value.Year, Month = hd.NgayMua.Value.Month })
-                .Select(g => new StatisticalDTO
+                .GroupBy(hd => new {
+                    Year = hd.NgayMua.Value.Year,
+                    Month = hd.NgayMua.Value.Month
+                })
+                .Select(g => new DAL.RevenueDAL.StatisticalDTO
                 {
-                    Thang = $"{g.Key.Month}/{g.Key.Year}",
-                    TongDoanhThu = g.Sum(h => h.TongTien.GetValueOrDefault()),
-                    SoLuongKhach = g.Select(h => h.MaKH).Distinct().Count(), // Tính số khách hàng duy nhất
-                    // Giả định DAL có hàm tính tổng số ghế cho một group/tháng
+                    // Định dạng tháng thành "MM/YYYY"
+                    Thang = $"{g.Key.Month:00}/{g.Key.Year}",
+
+                    // Tính Tổng Doanh Thu (cần ép kiểu (decimal) nếu TongTien trong Entity là double/float)
+                    TongDoanhThu = (decimal)g.Sum(h => h.TongTien ?? 0f),                    // Tính số khách hàng duy nhất (đếm số MaKH khác nhau)
+                    SoLuongKhach = g.Select(h => h.MaKH).Distinct().Count(),
+
+                    // Gọi DAL để tính tổng số ghế đã bán trong tháng đó (vì cần truy cập bảng ChiTiet)
                     SoLuongGhe = revenueDAL.GetTotalSeatsForMonth(g.Key.Year, g.Key.Month)
                 })
                 .OrderBy(s => s.Thang)
@@ -73,6 +79,7 @@ namespace CGVStore.BUS
         /// </summary>
         public ReportDataContainer LayDuLieuThoChoBaoCao()
         {
+            // Lấy 3 danh sách dữ liệu thô từ DAL và đóng gói vào container
             return new ReportDataContainer
             {
                 HoaDonList = revenueDAL.GetHoaDonRaw(),
@@ -80,12 +87,28 @@ namespace CGVStore.BUS
                 KhachHangList = revenueDAL.GetKhachHangRaw()
             };
         }
+        // Thêm vào lớp RevenueBUS
+        public int GetGrandTotalDistinctCustomers()
+        {
+            
+
+            using (Model1 db = new Model1()) // Cần đảm bảo có using CGVStore.Models;
+            {
+                return db.HoaDons
+                         .Select(hd => hd.MaKH)
+                         .Distinct()
+                         .Count();
+            }
+        }
+        public List<HoaDonSearchResultDTO> TimKiemHoaDonTheoTenKhachHang(string keyword)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                return new List<HoaDonSearchResultDTO>();
+            }
+
+            // Gọi DAL. Phương thức này sẽ thực hiện truy vấn với .Contains()
+            return revenueDAL.TimKiemHoaDonTheoTenKhachHangDAL(keyword);
+        }
     }
 }
-// ----------------------------------------------------------------------------------
-// CÁC LỚP DATA TRANSFER OBJECT (DTO)/VIEWMODEL DÙNG TRONG BUS (Nên đặt trong 1 file riêng)
-// ----------------------------------------------------------------------------------
-
-// LƯU Ý: Các lớp DTO/ViewModel này nên được tạo trong một thư mục/namespace riêng biệt 
-// (Ví dụ: CGVStore.Common.DTOs) để tránh phụ thuộc trực tiếp vào Entity Models.
-

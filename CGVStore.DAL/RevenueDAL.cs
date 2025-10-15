@@ -27,7 +27,7 @@ namespace CGVStore.DAL
                     {
                         MaHD = hd.MaHD,
                         TenKH = hd.KhachHang.TenKH,
-                        TongTien = hd.TongTien.GetValueOrDefault(),
+                        TongTien = (decimal)(hd.TongTien ?? 0f),
                         NgayMua = hd.NgayMua,
 
                         // Subquery để tính tổng số ghế của mỗi hóa đơn
@@ -75,6 +75,27 @@ namespace CGVStore.DAL
 
                 // Đếm Chi Tiết (ghế) dựa trên danh sách MaHD
                 return db.ChiTiets.Count(ct => maHDs.Contains(ct.MaHD));
+            }
+        }
+        // KHÁI NIỆM: Logic này nằm trong file RevenueDAL.cs
+
+        public List<HoaDonSearchResultDTO> TimKiemHoaDonTheoTenKhachHangDAL(string keyword)
+        {
+            using (var db = new Model1())
+            {
+                // Sử dụng .Contains(keyword) để thực hiện tìm kiếm một phần
+                var result = db.HoaDons
+                               .Where(hd => hd.KhachHang != null &&
+                                            hd.KhachHang.TenKH.Contains(keyword)) // <--- Đây là logic tìm kiếm một phần
+                               .Select(hd => new HoaDonSearchResultDTO
+                               {
+                                   MaHD = hd.MaHD,
+                                   TenKH = hd.KhachHang.TenKH,
+                                   NgayMua = hd.NgayMua,
+                                   TongTien = (decimal?)hd.TongTien
+                               })
+                               .ToList();
+                return result;
             }
         }
 
@@ -128,6 +149,13 @@ namespace CGVStore.DAL
             public List<HoaDon> HoaDonList { get; set; }
             public List<ChiTiet> ChiTietList { get; set; }
             public List<KhachHang> KhachHangList { get; set; }
+        }
+        public class HoaDonSearchResultDTO
+        {
+            public int MaHD { get; set; }
+            public string TenKH { get; set; } // Cần có Tên Khách Hàng để hiển thị
+            public DateTime? NgayMua { get; set; }
+            public decimal? TongTien { get; set; }
         }
     }
 }

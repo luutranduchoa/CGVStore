@@ -1,12 +1,14 @@
 ﻿using System;
-using System.Linq;
 using System.Windows.Forms;
-using CGVStore.Models; // Cần thiết để truy cập Entity Area và DbContext Model1
+using CGVStore.BUS; // Cần thiết để truy cập lớp AreaBUS
 
 namespace CGVStore
 {
     public partial class Form3 : Form
     {
+        // Khai báo và khởi tạo instance của lớp BUS
+        private AreaBUS areaBUS = new AreaBUS();
+
         public Form3()
         {
             InitializeComponent();
@@ -22,40 +24,25 @@ namespace CGVStore
             // 3. Đặt focus vào ô Mã Số khi Form khởi động
             this.Load += (sender, e) => { textBox1.Focus(); };
 
-            // 4. Mã số (AreaID) không được tự động tạo, nên phải cho phép người dùng nhập.
-            // Có thể thêm logic kiểm tra xem nó có phải là số hay không.
+            // Loại bỏ dòng thừa: public Action<object, object> SaveAreaClick { get; internal set; }
         }
-
-        public Action<object, object> SaveAreaClick { get; internal set; }
 
         // =======================================================
         //                 HÀM XỬ LÝ SỰ KIỆN
         // =======================================================
 
         /// <summary>
-        /// Xử lý sự kiện khi nhấp vào nút Thêm (button1)
+        /// Xử lý sự kiện khi nhấp vào nút Thêm (button1).
+        /// Nhiệm vụ chính là gọi BUS và bắt lỗi.
         /// </summary>
         private void buttonThem_Click(object sender, EventArgs e)
         {
-            // 1. Lấy dữ liệu từ Form
-            if (!int.TryParse(textBox1.Text.Trim(), out int areaID))
-            {
-                MessageBox.Show("Mã Số Khu Vực phải là một số nguyên hợp lệ.", "Lỗi Dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                textBox1.Focus();
-                return;
-            }
-
+            // Lấy dữ liệu thô từ UI
+            string areaIDText = textBox1.Text.Trim();
             string areaName = textBox2.Text.Trim();
 
-            if (string.IsNullOrEmpty(areaName))
-            {
-                MessageBox.Show("Tên Khu Vực không được để trống.", "Lỗi Dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                textBox2.Focus();
-                return;
-            }
-
-            // 2. Gọi hàm thêm vào Database
-            ThemKhuVucVaoDatabase(areaID, areaName);
+            // GỌI BUS ĐỂ XỬ LÝ
+            XuLyThemKhuVuc(areaIDText, areaName);
         }
 
         /// <summary>
@@ -63,52 +50,58 @@ namespace CGVStore
         /// </summary>
         private void buttonThoat_Click(object sender, EventArgs e)
         {
-            this.Close(); // Đóng Form Khu Vực (Form con MDI)
+            this.Close(); // Đóng Form Khu Vực
         }
 
         // =======================================================
-        //                 LOGIC NGHIỆP VỤ (Database)
+        //                 LOGIC GỌI BUS VÀ HIỂN THỊ THÔNG BÁO
         // =======================================================
 
         /// <summary>
-        /// Thực hiện thêm mới một Khu Vực vào cơ sở dữ liệu
+        /// Gọi lớp BUS để thực hiện thêm Khu Vực và hiển thị kết quả/lỗi.
         /// </summary>
-        private void ThemKhuVucVaoDatabase(int areaID, string areaName)
+        private void XuLyThemKhuVuc(string areaIDText, string areaName)
         {
             try
             {
-                using (var db = new Model1()) // Khởi tạo DbContext
-                {
-                    // 1. Kiểm tra AreaID đã tồn tại chưa
-                    if (db.Areas.Any(a => a.AreaID == areaID))
-                    {
-                        MessageBox.Show($"Mã Khu Vực ({areaID}) đã tồn tại. Vui lòng chọn mã khác.", "Lỗi Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        textBox1.Focus();
-                        return;
-                    }
+                // Gọi hàm xử lý nghiệp vụ chính trong lớp BUS
+                areaBUS.XuLyThemKhuVuc(areaIDText, areaName);
 
-                    // 2. Tạo đối tượng Area mới
-                    var newArea = new Area
-                    {
-                        AreaID = areaID,
-                        AreaName = areaName
-                    };
+                // --- Xử lý khi thành công ---
+                MessageBox.Show($"Đã thêm Khu Vực: {areaName} thành công!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    // 3. Thêm vào DbSet và lưu thay đổi
-                    db.Areas.Add(newArea);
-                    db.SaveChanges();
-
-                    MessageBox.Show($"Đã thêm Khu Vực: {areaName} (ID: {areaID}) thành công!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                    // 4. Làm sạch Form sau khi thêm thành công
-                    textBox1.Clear();
-                    textBox2.Clear();
+                // Làm sạch Form sau khi thêm thành công
+                textBox1.Clear();
+                textBox2.Clear();
+                textBox1.Focus();
+            }
+            // Bắt các lỗi do BUS ném ra để thông báo chính xác cho người dùng
+            catch (ArgumentException ex)
+            {
+                // Lỗi dữ liệu rỗng hoặc số không dương
+                MessageBox.Show(ex.Message, "Lỗi Nghiệp vụ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Xác định focus dựa trên lỗi
+                if (ex.Message.Contains("Mã số") || ex.Message.Contains("dương"))
                     textBox1.Focus();
-                }
+                else
+                    textBox2.Focus();
+            }
+            catch (FormatException ex)
+            {
+                // Lỗi ép kiểu từ chuỗi sang số nguyên (Mã Khu Vực không phải là số)
+                MessageBox.Show(ex.Message, "Lỗi Định dạng", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                textBox1.Focus();
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Lỗi trùng lặp ID
+                MessageBox.Show(ex.Message, "Lỗi Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                textBox1.Focus();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi khi thêm Khu Vực vào cơ sở dữ liệu: " + ex.Message, "Lỗi Database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Bắt lỗi chung (ví dụ: lỗi Database/kết nối từ DAL)
+                MessageBox.Show("Lỗi hệ thống: " + ex.Message, "Lỗi Database/Hệ thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

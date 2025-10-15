@@ -32,21 +32,27 @@ namespace CGVStore.DAL
         /// Lấy danh sách Hóa Đơn kèm theo tên Khách Hàng cho DGV.
         /// Giả định mô hình dữ liệu cần trả về đối tượng dễ hiển thị.
         /// </summary>
+        // Trong file TicketDAL.cs, phương thức LayDanhSachHoaDonView()
+
         public object LayDanhSachHoaDonView()
         {
             using (var db = new Model1())
             {
-                // Truy vấn kết hợp HoaDon và KhachHang
                 var result = db.HoaDons
-                    .Include(hd => hd.KhachHang) // Sử dụng Include để load KhachHang liên quan
+                    .Include(hd => hd.KhachHang)
                     .OrderByDescending(hd => hd.NgayMua)
                     .Select(hd => new
                     {
                         MaHD = hd.MaHD,
                         MaKH = hd.MaKH,
-                        TenKhachHang = hd.KhachHang.TenKH, // Lấy tên Khách hàng
+                        TenKhachHang = hd.KhachHang.TenKH,
                         SDT = hd.KhachHang.SDT,
-                        TongTien = hd.TongTien.GetValueOrDefault(),
+
+                        // SỬA LỖI: Thay thế GetValueOrDefault()
+                        // hd.TongTien là float?. Sử dụng ?? 0f để xử lý null.
+                        // Ép kiểu (decimal) để phù hợp với hiển thị tiền tệ trên DGV.
+                        TongTien = hd.TongTien ?? 0.0,
+
                         NgayMua = hd.NgayMua
                     })
                     .ToList();

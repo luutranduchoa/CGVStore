@@ -1,12 +1,15 @@
 ﻿using System;
-using System.Linq;
 using System.Windows.Forms;
-using CGVStore.Models; // Cần thiết để truy cập Entity User và DbContext Model1
+using CGVStore.BUS; // Cần thiết để truy cập lớp UserBUS
+using CGVStore.Models;
 
 namespace CGVStore
 {
     public partial class Form4 : Form
     {
+        // Khai báo và khởi tạo instance của lớp BUS
+        private UserBUS userBUS = new UserBUS();
+
         public Form4()
         {
             InitializeComponent();
@@ -16,6 +19,7 @@ namespace CGVStore
             this.Name = "FormTaoTaiKhoan";
 
             // 2. Thiết lập cho TextBox Mật Khẩu
+            // Giả định: textBox2 là Mật khẩu, textBox3 là Xác nhận Mật khẩu
             this.textBox2.PasswordChar = '•';
             this.textBox3.PasswordChar = '•';
 
@@ -32,39 +36,18 @@ namespace CGVStore
         // =======================================================
 
         /// <summary>
-        /// Xử lý sự kiện khi nhấp vào nút Đăng Ký (Thêm User) (button1)
+        /// Xử lý sự kiện khi nhấp vào nút Đăng Ký (Thêm User) (button1).
+        /// Nhiệm vụ chính là gọi BUS và bắt lỗi.
         /// </summary>
         private void buttonDangKy_Click(object sender, EventArgs e)
         {
-            // 1. Lấy dữ liệu từ Form
+            // Lấy dữ liệu thô từ UI
             string username = textBox1.Text.Trim();
-            string password = textBox2.Text.Trim();
-            string confirmPassword = textBox3.Text.Trim();
+            string password = textBox2.Text; // Giữ nguyên khoảng trắng nếu có (mật khẩu)
+            string confirmPassword = textBox3.Text; // Giữ nguyên khoảng trắng nếu có (mật khẩu)
 
-            // 2. Kiểm tra dữ liệu đầu vào
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirmPassword))
-            {
-                MessageBox.Show("Vui lòng nhập đầy đủ Tài khoản, Mật khẩu và Xác nhận Mật khẩu.", "Lỗi Dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (password.Length < 6)
-            {
-                MessageBox.Show("Mật khẩu phải chứa ít nhất 6 ký tự.", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                textBox2.Focus();
-                return;
-            }
-
-            if (password != confirmPassword)
-            {
-                MessageBox.Show("Mật khẩu và Xác nhận Mật khẩu không khớp.", "Lỗi Xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                textBox3.Clear();
-                textBox3.Focus();
-                return;
-            }
-
-            // 3. Gọi hàm thêm vào Database
-            ThemUserVaoDatabase(username, password);
+            // Gọi hàm xử lý và bắt lỗi
+            XuLyThemUser(username, password, confirmPassword);
         }
 
         /// <summary>
@@ -72,61 +55,53 @@ namespace CGVStore
         /// </summary>
         private void buttonThoat_Click(object sender, EventArgs e)
         {
-            this.Close(); // Đóng Form Tạo Tài Khoản (Form con MDI)
+            this.Close();
         }
 
         // =======================================================
-        //                 LOGIC NGHIỆP VỤ (Database)
+        //                 LOGIC GỌI BUS VÀ HIỂN THỊ THÔNG BÁO
         // =======================================================
 
         /// <summary>
-        /// Thực hiện thêm mới một User vào cơ sở dữ liệu
+        /// Gọi lớp BUS để thực hiện thêm User và hiển thị kết quả/lỗi.
         /// </summary>
-        private void ThemUserVaoDatabase(string username, string password)
+        private void XuLyThemUser(string username, string password, string confirmPassword)
         {
             try
             {
-                using (var db = new Model1()) // Khởi tạo DbContext
-                {
-                    // 1. Kiểm tra TenUser đã tồn tại chưa
-                    if (db.Users.Any(u => u.TenUser.Equals(username, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        MessageBox.Show($"Tài khoản '{username}' đã tồn tại. Vui lòng chọn tên khác.", "Lỗi Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        textBox1.Focus();
-                        return;
-                    }
+                // Gọi hàm xử lý nghiệp vụ chính trong lớp BUS
+                userBUS.XuLyThemUser(username, password, confirmPassword);
 
-                    // 2. Tự động tìm MaUser lớn nhất và tăng thêm 1
-                    int nextMaUser = 1;
-                    if (db.Users.Any())
-                    {
-                        nextMaUser = db.Users.Max(u => u.MaUser) + 1;
-                    }
+                // --- Xử lý khi thành công ---
+                MessageBox.Show($"Đã tạo Tài khoản '{username}' thành công!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    // 3. Tạo đối tượng User mới
-                    var newUser = new User
-                    {
-                        MaUser = nextMaUser,
-                        TenUser = username,
-                        MatKhau = password // LƯU Ý: Trong thực tế, cần mã hóa mật khẩu trước khi lưu
-                    };
-
-                    // 4. Thêm vào DbSet và lưu thay đổi
-                    db.Users.Add(newUser);
-                    db.SaveChanges();
-
-                    MessageBox.Show($"Đã tạo Tài khoản '{username}' thành công! (Mã User: {nextMaUser})", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                    // 5. Làm sạch Form sau khi thêm thành công
-                    textBox1.Clear();
-                    textBox2.Clear();
-                    textBox3.Clear();
-                    textBox1.Focus();
-                }
+                // Làm sạch Form sau khi thêm thành công
+                textBox1.Clear();
+                textBox2.Clear();
+                textBox3.Clear();
+                textBox1.Focus();
+            }
+            // Bắt các lỗi do BUS ném ra để thông báo chính xác cho người dùng
+            catch (ArgumentException ex)
+            {
+                // Lỗi dữ liệu rỗng hoặc mật khẩu không khớp
+                MessageBox.Show(ex.Message, "Lỗi Nghiệp vụ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Đặt focus tùy thuộc vào loại lỗi
+                if (ex.Message.Contains("không được để trống"))
+                    textBox1.Focus(); // Giả định lỗi rỗng thường bắt đầu ở ô đầu tiên
+                else if (ex.Message.Contains("không khớp"))
+                    textBox3.Focus(); // Đặt focus vào ô xác nhận mật khẩu
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Lỗi trùng tên tài khoản
+                MessageBox.Show(ex.Message, "Lỗi Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                textBox1.Focus();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi khi tạo Tài khoản vào cơ sở dữ liệu: " + ex.Message, "Lỗi Database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Bắt lỗi hệ thống hoặc database (từ DAL)
+                MessageBox.Show("Lỗi hệ thống: " + ex.Message, "Lỗi Database/Hệ thống", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

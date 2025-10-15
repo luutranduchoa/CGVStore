@@ -25,7 +25,7 @@ namespace CGVStore.Models
         [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int MaKH { get; set; }
 
-        public decimal? TongTien { get; set; }
+        public float? TongTien { get; set; }
 
         [Column(TypeName = "date")]
         public DateTime? NgayMua { get; set; }

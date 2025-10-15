@@ -163,12 +163,6 @@
     <Compile Include="FormReport.Designer.cs">
       <DependentUpon>FormReport.cs</DependentUpon>
     </Compile>
-    <Compile Include="Models\Area.cs" />
-    <Compile Include="Models\ChiTiet.cs" />
-    <Compile Include="Models\HoaDon.cs" />
-    <Compile Include="Models\KhachHang.cs" />
-    <Compile Include="Models\Model1.cs" />
-    <Compile Include="Models\User.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Form1.resx">
@@ -225,7 +219,16 @@
     <Content Include="resources\blue-add-button-12025 %281%29.png" />
     <Content Include="resources\blue-add-button-12025.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\CGVStore.BUS\CGVStore.BUS.csproj">
+      <Project>{0ea0c7a1-baa6-45f2-9719-2640aa4b9036}</Project>
+      <Name>CGVStore.BUS</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CGVStore.DAL\CGVStore.DAL.csproj">
+      <Project>{0f0c9d0c-4989-4809-a3c0-e154645b5d89}</Project>
+      <Name>CGVStore.DAL</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

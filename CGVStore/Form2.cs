@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Linq;
 using System.Windows.Forms;
-using CGVStore.Models; // Cần thiết để truy cập DbContext (Model1) và Entity (User)
+using CGVStore.BUS; // Cần thiết để truy cập DbContext (Model1) và Entity (User)
 
 namespace CGVStore
 {
     public partial class Form2 : Form
     {
+        private UserBUS userBUS = new UserBUS();
         public Form2()
         {
             InitializeComponent();
@@ -37,41 +38,39 @@ namespace CGVStore
         private void buttonDangNhap_Click(object sender, EventArgs e)
         {
             string username = textBox1.Text.Trim();
-            string password = textBox2.Text.Trim();
+            string password = textBox2.Text;
 
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            try
             {
-                MessageBox.Show("Vui lòng nhập đầy đủ Tài khoản và Mật khẩu.", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // 1. Kiểm tra đăng nhập với Database
-            bool loginSuccess = KiemTraDangNhap(username, password);
-
-            if (loginSuccess)
-            {
-                MessageBox.Show("Đăng nhập thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                // 2. Mở khóa Menu Chính trên Form1 (MDI Parent)
-                if (this.MdiParent is Form1 parent)
+                // **GỌI BUS** để xử lý nghiệp vụ Đăng Nhập
+                if (userBUS.XuLyDangNhap(username, password))
                 {
-                    // Đảm bảo Form1.cs đã được sửa để đặt thuộc tính này là public/internal
-                    parent.chứcNăngToolStripMenuItem.Enabled = true;
-                    parent.đăngNhậpToolStripMenuItem.Enabled = false; // Vô hiệu hóa nút Đăng Nhập
-                    parent.Text = $"Hệ Thống Bán Vé CGV - Chào mừng: {username}";
-                }
+                    MessageBox.Show("Đăng nhập thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // 3. Đóng Form Đăng Nhập
-                this.Close();
+                    // Logic mở khóa chức năng trên Form1 (vẫn giữ ở UI)
+                    if (this.MdiParent is Form1 mainForm)
+                    {
+                        mainForm.chứcNăngToolStripMenuItem.Enabled = true;
+                        mainForm.đăngNhậpToolStripMenuItem.Enabled = false;
+                    }
+                    this.Close();
+                }
+                else
+                {
+                    // Lỗi trả về từ DAL/BUS (Sai tài khoản/mật khẩu)
+                    MessageBox.Show("Tên đăng nhập hoặc mật khẩu không đúng.", "Lỗi Đăng Nhập", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    textBox1.Focus();
+                }
             }
-            else
+            catch (ArgumentException ex) // Bắt lỗi nghiệp vụ (vd: thiếu input)
             {
-                MessageBox.Show("Tài khoản hoặc Mật khẩu không chính xác.", "Lỗi Đăng nhập", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                textBox2.Clear();
-                textBox2.Focus();
+                MessageBox.Show(ex.Message, "Lỗi Nhập Liệu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex) // Bắt lỗi khác (vd: lỗi kết nối database)
+            {
+                MessageBox.Show("Đã xảy ra lỗi hệ thống: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
         /// <summary>
         /// Xử lý sự kiện khi nhấp vào nút Thoát (button2)
         /// </summary>
@@ -97,29 +96,5 @@ namespace CGVStore
         /// Hàm kiểm tra Tài khoản và Mật khẩu bằng Entity Framework.
         /// Sử dụng trường MatKhau mới được thêm vào Entity User.
         /// </summary>
-        private bool KiemTraDangNhap(string username, string password)
-        {
-            // CẢNH BÁO: Mật khẩu nên được BĂM (Hash) trước khi lưu/so sánh.
-            // Đoạn code này chỉ so sánh mật khẩu dạng chuỗi trần.
-            try
-            {
-                using (var db = new Model1()) // Khởi tạo DbContext
-                {
-                    // Truy vấn tìm user dựa trên TenUser (không phân biệt chữ hoa/chữ thường) 
-                    // và MatKhau (phân biệt chữ hoa/chữ thường)
-                    var user = db.Users
-                                 .FirstOrDefault(u => u.TenUser.Equals(username, StringComparison.OrdinalIgnoreCase) &&
-                                                      u.MatKhau == password);
-
-                    return user != null;
-                }
-            }
-            catch (Exception ex)
-            {
-                // Xử lý khi có lỗi kết nối database
-                MessageBox.Show("Lỗi kết nối hoặc truy vấn cơ sở dữ liệu: " + ex.Message, "Lỗi Database", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return false;
-            }
-        }
     }
 }

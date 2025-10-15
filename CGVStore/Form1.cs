@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Windows.Forms;
-using CGVStore.Models; // Để sử dụng các models nếu cần
 using CGVStore;
 
 namespace CGVStore
